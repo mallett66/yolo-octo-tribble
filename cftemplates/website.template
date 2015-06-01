@@ -1,0 +1,66 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Template for Website",
+    "Parameters": {
+        "amiID": {
+            "Description": "The new ami id from packer",
+            "Type": "String"
+        },
+        "WebServerCapacity": {
+            "Default": "1",
+            "Description": "The initial number of WebServer instances",
+            "Type": "Number",
+            "MinValue": "1",
+            "MaxValue": "5",
+            "ConstraintDescription": "must be between 1 and 5 EC2 instances."
+        }
+    },
+    "Resources": {
+        "ElasticLoadBalancer": {
+            "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties": {
+                "SecurityGroups": [ "sg-8aa0acef", "sg-d3bfb3b6" ],
+                "Subnets": [ "subnet-9cd80ec5" ],
+                "Listeners": [
+                    { "LoadBalancerPort": "80",
+                      "InstancePort": "80",
+                      "Protocol": "HTTP" }
+                ],
+                "HealthCheck": {
+                    "Target": "HTTP:80/",
+                    "HealthyThreshold": "2",
+                    "UnhealthyThreshold": "5",
+                    "Interval": "5",
+                    "Timeout": "3"
+                }
+            }
+        },
+        "AutoScalingGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": { 
+                "AvailabilityZones": [ "us-west-2c" ],
+                "LaunchConfigurationName": { "Ref": "LaunchConfig" },
+                "MinSize": "1",
+                "MaxSize": "5",
+                "DesiredCapacity": { "Ref": "WebServerCapacity" },
+                "LoadBalancerNames": [ { "Ref": "ElasticLoadBalancer" } ],
+                "VPCZoneIdentifier": [ "subnet-9cd80ec5" ]
+            }
+        },
+        "LaunchConfig": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": { "Ref": "amiID" },
+                "InstanceType": "t2.micro",
+                "KeyName": "aws-sshkey",
+                "SecurityGroups": [ "sg-8aa0acef", "sg-d3bfb3b6" ]
+            }
+        }
+    },
+    "Outputs" : {
+        "URL" : {
+            "Description" : "The URL of your website",
+            "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "ElasticLoadBalancer", "DNSName" ]}]]}
+        }
+    }
+}
